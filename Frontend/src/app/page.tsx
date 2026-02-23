@@ -5,12 +5,22 @@ import { Zap, Activity, History, AlertCircle, Trash2, BarChart3, Calculator, Tre
 import PredictionForm from "@/components/PredictionForm";
 import PredictionResult from "@/components/PredictionResult";
 import HistoryList from "@/components/HistoryList";
+import Login from "@/components/Login";
+import UserDashboard from "@/components/UserDasboard";
 
 interface HistoryItem {
   id: number;
   units: number;
   predicted_bill: number;
   timestamp: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  created_at: string;
 }
 
 export default function BillApp() {
@@ -23,11 +33,54 @@ export default function BillApp() {
   const [inputError, setInputError] = useState<string>("");
   const [showResult, setShowResult] = useState(false);
 
+  // Authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [guestPredictionCount, setGuestPredictionCount] = useState(0);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [appLoading, setAppLoading] = useState(true);
+
+  // Initialize authentication state
+  useEffect(() => {
+    const checkAuth = () => {
+      const storedUser = localStorage.getItem("user");
+      const isLoggedInStored = localStorage.getItem("isLoggedIn");
+
+      if (storedUser && isLoggedInStored === "true") {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setIsLoggedIn(true);
+      } else {
+        // Load guest prediction count
+        const today = new Date().toDateString();
+        const guestData = localStorage.getItem("guestPredictions");
+        if (guestData) {
+          const { date, count } = JSON.parse(guestData);
+          if (date === today) {
+            setGuestPredictionCount(count);
+          } else {
+            // Reset count for new day
+            localStorage.setItem("guestPredictions", JSON.stringify({ date: today, count: 0 }));
+            setGuestPredictionCount(0);
+          }
+        } else {
+          localStorage.setItem("guestPredictions", JSON.stringify({ date: today, count: 0 }));
+        }
+      }
+      setAppLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
   const fetchHistory = async () => {
     setHistoryLoading(true);
     setError(null);
     try {
-      const res = await fetch("http://localhost:5000/api/history");
+      const url = isLoggedIn
+        ? `http://localhost:5000/api/history?user_id=${user?.id}`
+        : "http://localhost:5000/api/history";
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch history");
       const data = await res.json();
       setHistory(data);
@@ -37,6 +90,12 @@ export default function BillApp() {
       setHistoryLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!appLoading) {
+      fetchHistory();
+    }
+  }, [isLoggedIn, user, appLoading]);
 
   const deleteHistoryItem = async (id: number) => {
     try {
@@ -50,7 +109,10 @@ export default function BillApp() {
   const clearAllHistory = async () => {
     if (!window.confirm("Clear all prediction history? This cannot be undone.")) return;
     try {
-      const res = await fetch("http://localhost:5000/api/history/clear", { method: "DELETE" });
+      const url = isLoggedIn
+        ? `http://localhost:5000/api/history/clear?user_id=${user?.id}`
+        : "http://localhost:5000/api/history/clear";
+      const res = await fetch(url, { method: "DELETE" });
       if (res.ok) {
         setHistory([]);
         await fetchHistory();
@@ -62,7 +124,18 @@ export default function BillApp() {
     }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  const handleLoginSuccess = (userData: User) => {
+    setUser(userData);
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setIsLoggedIn(false);
+    setHistory([]);
+    setShowLoginModal(false);
+  };
 
   const validateInput = (): boolean => {
     const numUnits = parseFloat(units);
@@ -74,6 +147,15 @@ export default function BillApp() {
 
   const handlePredict = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check guest prediction limit
+    if (!isLoggedIn) {
+      if (guestPredictionCount >= 4) {
+        setShowLoginModal(true);
+        return;
+      }
+    }
+
     if (!validateInput()) return;
     setLoading(true);
     setError(null);
@@ -82,7 +164,10 @@ export default function BillApp() {
       const res = await fetch("http://localhost:5000/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ units: parseFloat(units) }),
+        body: JSON.stringify({
+          units: parseFloat(units),
+          user_id: isLoggedIn ? user?.id : null,
+        }),
       });
       if (!res.ok) throw new Error("Prediction failed");
       const data = await res.json();
@@ -90,6 +175,19 @@ export default function BillApp() {
       setShowResult(true);
       fetchHistory();
       setUnits("");
+
+      // Update guest prediction count
+      if (!isLoggedIn) {
+        const newCount = guestPredictionCount + 1;
+        setGuestPredictionCount(newCount);
+        const today = new Date().toDateString();
+        localStorage.setItem("guestPredictions", JSON.stringify({ date: today, count: newCount }));
+
+        // Show login modal if guest reached limit
+        if (newCount >= 4) {
+          setShowLoginModal(true);
+        }
+      }
     } catch (err) {
       setError("Error: Is your Python backend running?");
     } finally {
@@ -100,6 +198,154 @@ export default function BillApp() {
   const totalSpent = history.reduce((sum, item) => sum + item.predicted_bill, 0);
   const avgBill = history.length > 0 ? totalSpent / history.length : 0;
   const totalUnits = history.reduce((sum, item) => sum + item.units, 0);
+
+  if (appLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--ink)",
+      }}>
+        <div style={{
+          width: "28px",
+          height: "28px",
+          border: "2px solid var(--border)",
+          borderTopColor: "var(--gold)",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }} />
+      </div>
+    );
+  }
+
+  // Show dashboard if logged in
+  if (isLoggedIn && user) {
+    return (
+      <>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+          :root {
+            --gold: #c9a84c;
+            --gold-light: #e8c96e;
+            --gold-dim: #7a6230;
+            --ink: #08080a;
+            --paper: #0e0e12;
+            --surface: #13131a;
+            --surface-2: #1a1a24;
+            --border: #2a2a38;
+            --border-light: #38384a;
+            --text-primary: #f0ece0;
+            --text-secondary: #8a8a9a;
+            --text-muted: #4a4a5a;
+            --red: #c44;
+          }
+
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+
+          body {
+            background: var(--ink);
+            color: var(--text-primary);
+            font-family: 'IBM Plex Sans', sans-serif;
+          }
+
+          .dashboard-app {
+            min-height: 100vh;
+            background:
+              radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201,168,76,0.06) 0%, transparent 60%),
+              radial-gradient(ellipse 40% 40% at 90% 80%, rgba(201,168,76,0.03) 0%, transparent 50%),
+              var(--ink);
+          }
+
+          .noise-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.025;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 180px;
+          }
+
+          .dashboard-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 48px 32px;
+          }
+
+          .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            position: relative;
+            margin-top: 48px;
+          }
+
+          .panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, var(--gold) 0%, transparent 60%);
+          }
+
+          .panel-body { padding: 28px; }
+
+          .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 28px;
+          }
+
+          .panel-title svg { color: var(--gold); }
+
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+
+        <div className="dashboard-app">
+          <div className="noise-overlay" />
+          <div className="dashboard-container">
+            <UserDashboard user={user} onLogout={handleLogout} />
+
+            {/* Prediction Form Section for Logged In Users */}
+            <div className="panel">
+              <div className="panel-body">
+                <div className="panel-title">
+                  <Activity size={14} />
+                  Make a Prediction
+                </div>
+                <PredictionForm
+                  units={units}
+                  setUnits={(val) => { setUnits(val); setInputError(""); }}
+                  onPredict={handlePredict}
+                  loading={loading}
+                  error={inputError}
+                />
+                {prediction !== null && showResult && (
+                  <div style={{ marginTop: "28px" }}>
+                    <PredictionResult value={prediction} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -489,30 +735,98 @@ export default function BillApp() {
                 )}
               </div>
 
-              {history.length > 0 && (
-                <div className="history-stats">
-                  <div className="h-stat">
-                    <div className="h-stat-label">Total Spent</div>
-                    <div className="h-stat-value gold">${totalSpent.toFixed(2)}</div>
+              {!isLoggedIn ? (
+                <div style={{
+                  padding: "80px 24px",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "16px",
+                  borderTop: "1px solid var(--border)",
+                }}>
+                  <div style={{
+                    width: "48px",
+                    height: "48px",
+                    border: "1px solid var(--border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-muted)",
+                  }}>
+                    <History size={24} />
                   </div>
-                  <div className="h-stat">
-                    <div className="h-stat-label">Average</div>
-                    <div className="h-stat-value amber">${avgBill.toFixed(2)}</div>
+                  <div style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: "11px",
+                    letterSpacing: "0.12em",
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                  }}>
+                    Sign In to View History
                   </div>
-                  <div className="h-stat">
-                    <div className="h-stat-label">kWh Tracked</div>
-                    <div className="h-stat-value">{totalUnits.toFixed(0)}</div>
+                  <div style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: "10px",
+                    color: "var(--text-muted)",
+                    letterSpacing: "0.05em",
+                  }}>
+                    Create an account to save and track your predictions
                   </div>
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    style={{
+                      marginTop: "12px",
+                      background: "var(--gold)",
+                      border: "none",
+                      color: "var(--ink)",
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      fontWeight: "600",
+                      padding: "10px 16px",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--gold-light)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "var(--gold)";
+                    }}
+                  >
+                    Sign In Now
+                  </button>
                 </div>
-              )}
+              ) : (
+                <>
+                  {history.length > 0 && (
+                    <div className="history-stats">
+                      <div className="h-stat">
+                        <div className="h-stat-label">Total Spent</div>
+                        <div className="h-stat-value gold">${totalSpent.toFixed(2)}</div>
+                      </div>
+                      <div className="h-stat">
+                        <div className="h-stat-label">Average</div>
+                        <div className="h-stat-value amber">${avgBill.toFixed(2)}</div>
+                      </div>
+                      <div className="h-stat">
+                        <div className="h-stat-label">kWh Tracked</div>
+                        <div className="h-stat-value">{totalUnits.toFixed(0)}</div>
+                      </div>
+                    </div>
+                  )}
 
-              <div style={{ padding: '24px' }}>
-                <HistoryList
-                  history={history}
-                  loading={historyLoading}
-                  onDelete={deleteHistoryItem}
-                />
-              </div>
+                  <div style={{ padding: '24px' }}>
+                    <HistoryList
+                      history={history}
+                      loading={historyLoading}
+                      onDelete={deleteHistoryItem}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -527,6 +841,35 @@ export default function BillApp() {
           </footer>
         </div>
       </div>
+
+      {/* Guest Prediction Counter Info */}
+      {!isLoggedIn && guestPredictionCount > 0 && (
+        <div style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderTop: "2px solid var(--gold)",
+          padding: "12px 16px",
+          zIndex: 9998,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: "11px",
+          color: "var(--text-secondary)",
+        }}>
+          <div>Guest Mode: {guestPredictionCount}/4 daily predictions used</div>
+          {guestPredictionCount >= 4 && (
+            <div style={{ color: "var(--gold)", marginTop: "4px" }}>
+              Limit reached. Sign up for unlimited!
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <Login onLoginSuccess={handleLoginSuccess} isModal={true} onClose={() => setShowLoginModal(false)} />
+      )}
     </>
   );
 }
