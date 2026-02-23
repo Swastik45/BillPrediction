@@ -5,15 +5,21 @@ import sqlite3
 from datetime import datetime, timedelta
 import uvicorn
 import hashlib
+import os
 from typing import Optional
 
-app = FastAPI()
+app = FastAPI(title="BillInsight API", version="1.0.0")
 
 # 1. CORS Configuration
-# This allows your Next.js app (on port 3000) to communicate with this API
+# Get allowed origins from environment or use default
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+
+# Strip whitespace from CORS origins
+cors_origins = [origin.strip() for origin in cors_origins]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -237,6 +243,29 @@ async def get_guest_predictions_today():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment monitoring"""
+    try:
+        conn = sqlite3.connect("bills.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+
 # 5. Run Server
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)
+    # Get configuration from environment
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", 5000))
+    reload = os.getenv("RELOAD", "True").lower() == "true"
+    
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info"
+    )
