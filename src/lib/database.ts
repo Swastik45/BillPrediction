@@ -32,10 +32,15 @@ export async function createUserWithAuth(email: string, password: string, userDa
     throw new Error('Username already exists')
   }
 
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  // Create auth user with admin API (auto-confirmed)
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
+    email_confirm: true, // Auto-confirm email
+    user_metadata: {
+      username: userData.username,
+      full_name: userData.full_name,
+    }
   })
 
   if (authError) {
