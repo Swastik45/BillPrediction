@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
         data: {
           username,
           full_name,
-        }
+        },
+        emailRedirectTo: 'https://vercel.com/psamarpaudel-4220s-projects/bill-prediction'
       }
     });
 

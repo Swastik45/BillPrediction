@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
+      options: {
+        emailRedirectTo: 'https://vercel.com/psamarpaudel-4220s-projects/bill-prediction'
+      }
     });
 
     if (error) {
