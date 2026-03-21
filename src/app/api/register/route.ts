@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createUserWithAuth } from '@/lib/database';
+import { createSupabaseAdminClient } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,18 +13,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ detail: 'Password must be at least 6 characters' }, { status: 400 });
     }
 
-    const user = await createUserWithAuth(email, password, { username, full_name });
+    const supabase = createSupabaseAdminClient();
 
-    // Return user data without sensitive information
-    const safeUser = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      full_name: user.full_name,
-      created_at: user.created_at,
-    };
+    // First check if username is taken
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .single();
 
-    return NextResponse.json(safeUser);
+    if (existingUser) {
+      return NextResponse.json({ detail: 'Username already exists' }, { status: 400 });
+    }
+
+    // Check if email is already registered
+    const { data: existingEmail } = await supabase.auth.admin.listUsers();
+    const emailExists = existingEmail.users.some(user => user.email === email);
+    if (emailExists) {
+      return NextResponse.json({ detail: 'Email already registered' }, { status: 400 });
+    }
+
+    // Create auth user with email confirmation
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+          full_name,
+        }
+      }
+    });
+
+    if (authError) {
+      return NextResponse.json({ detail: authError.message }, { status: 400 });
+    }
+
+    if (!authData.user) {
+      return NextResponse.json({ detail: 'Failed to create user' }, { status: 400 });
+    }
+
+    // Don't create profile yet - wait for email confirmation
+    return NextResponse.json({
+      message: 'Registration successful. Please check your email to confirm your account.',
+      email: authData.user.email
+    });
   } catch (error) {
     console.error('Registration error:', error);
     const message = error instanceof Error ? error.message : 'Registration failed';

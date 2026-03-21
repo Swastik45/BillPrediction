@@ -14,6 +14,9 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState<string>("");
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<string>("");
 
   // Login state
   const [loginUsername, setLoginUsername] = useState("");
@@ -29,6 +32,8 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setConfirmationMessage("");
+    setNeedsConfirmation(false);
     setLoading(true);
 
     if (!loginUsername || !loginPassword) {
@@ -47,7 +52,13 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || "Login failed");
+        if (data.needsConfirmation) {
+          setNeedsConfirmation(true);
+          setConfirmationEmail(data.email);
+          setError(data.detail);
+        } else {
+          setError(data.detail || "Login failed");
+        }
         setLoading(false);
         return;
       }
@@ -65,6 +76,7 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setConfirmationMessage("");
     setLoading(true);
 
     if (!regUsername || !regEmail || !regPassword || !regFullName || !regConfirmPassword) {
@@ -105,11 +117,45 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
         return;
       }
 
-      localStorage.setItem("user", JSON.stringify(data));
-      localStorage.setItem("isLoggedIn", "true");
-      onLoginSuccess(data);
+      // Registration successful, show confirmation message
+      setConfirmationMessage(data.message);
+      setIsRegister(false); // Switch to login form
+      // Clear register fields
+      setRegUsername("");
+      setRegEmail("");
+      setRegPassword("");
+      setRegFullName("");
+      setRegConfirmPassword("");
     } catch (err) {
       setError("Connection error. Please check your backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: confirmationEmail }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail || "Failed to resend confirmation");
+        setLoading(false);
+        return;
+      }
+
+      setConfirmationMessage("Confirmation email sent successfully. Please check your email.");
+      setNeedsConfirmation(false);
+    } catch (err) {
+      setError("Connection error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -315,6 +361,24 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
           flex-shrink: 0;
         }
 
+        .confirmation-message {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 20px;
+          padding: 12px 14px;
+          background: rgba(201, 168, 76, 0.06);
+          border: 1px solid rgba(201, 168, 76, 0.2);
+          border-left: 3px solid var(--gold);
+          font-family: 'IBM Plex Mono', monospace;
+          font-size: 11px;
+          color: rgba(240, 220, 180, 0.8);
+        }
+
+        .confirmation-message svg {
+          flex-shrink: 0;
+        }
+
         .submit-btn {
           width: 100%;
           background: var(--gold);
@@ -431,6 +495,35 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
               <div className="error-message">
                 <AlertCircle size={14} />
                 {error}
+                {needsConfirmation && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={loading}
+                    style={{
+                      marginLeft: 'auto',
+                      background: 'var(--gold)',
+                      border: 'none',
+                      color: 'var(--ink)',
+                      fontSize: '10px',
+                      padding: '4px 8px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                      fontFamily: 'IBM Plex Mono, monospace',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em'
+                    }}
+                  >
+                    Resend
+                  </button>
+                )}
+              </div>
+            )}
+
+            {confirmationMessage && (
+              <div className="confirmation-message">
+                <Mail size={14} />
+                {confirmationMessage}
               </div>
             )}
 
