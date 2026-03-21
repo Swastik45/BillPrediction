@@ -28,7 +28,7 @@ export default function UserDashboard({ user, onLogout }: UserDashboardProps) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:5000/api/history?user_id=${user.id}`);
+      const res = await fetch(`/api/history?user_id=${user.id}`);
       if (!res.ok) throw new Error("Failed to fetch history");
       const data = await res.json();
       setHistory(data);

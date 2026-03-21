@@ -78,8 +78,8 @@ export default function BillApp(): React.ReactNode {
     setError(null);
     try {
       const url = isLoggedIn
-        ? `http://localhost:5000/api/history?user_id=${user?.id}`
-        : "http://localhost:5000/api/history";
+        ? `/api/history?user_id=${user?.id}`
+        : "/api/history";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch history");
       const data = await res.json();
@@ -99,7 +99,7 @@ export default function BillApp(): React.ReactNode {
 
   const deleteHistoryItem = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/history/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
       if (res.ok) setHistory(history.filter((item) => item.id !== id));
     } catch (err) {
       console.error("Failed to delete item:", err);
@@ -110,8 +110,8 @@ export default function BillApp(): React.ReactNode {
     if (!window.confirm("Clear all prediction history? This cannot be undone.")) return;
     try {
       const url = isLoggedIn
-        ? `http://localhost:5000/api/history/clear?user_id=${user?.id}`
-        : "http://localhost:5000/api/history/clear";
+        ? `/api/history?user_id=${user?.id}`
+        : "/api/history";
       const res = await fetch(url, { method: "DELETE" });
       if (res.ok) {
         setHistory([]);
@@ -161,7 +161,7 @@ export default function BillApp(): React.ReactNode {
     setError(null);
     setShowResult(false);
     try {
-      const res = await fetch("http://localhost:5000/api/predict", {
+      const res = await fetch("/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

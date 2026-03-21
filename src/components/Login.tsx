@@ -38,7 +38,7 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/login", {
+      const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: loginUsername, password: loginPassword }),
@@ -86,7 +86,7 @@ export default function Login({ onLoginSuccess, isModal = false, onClose }: Logi
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/register", {
+      const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
