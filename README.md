@@ -2,7 +2,7 @@
 
 An elegant, full-stack web application for predicting electricity bill costs using machine learning algorithms. Built with Next.js, featuring a sleek dark UI, user authentication, and comprehensive prediction history tracking.
 
-(![BillInsight Preview](https://bill-prediction-git-main-psamarpaudel-4220s-projects.vercel.app/))
+
 
 ## ✨ Features
 
