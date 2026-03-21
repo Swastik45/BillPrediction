@@ -32,38 +32,84 @@ An elegant, full-stack web application for predicting electricity bill costs usi
 
 ### Backend
 - **Next.js API Routes** - Serverless API endpoints
-- **In-Memory Database** - Fast data storage (easily replaceable with PostgreSQL/SQLite)
-- **bcrypt** (planned) - Password hashing
-- **JWT** (planned) - Authentication tokens
+- **Supabase** - PostgreSQL database with real-time features
+- **Supabase Auth** - Secure user authentication and authorization
+- **Row Level Security (RLS)** - Database-level access control
+- **JWT Tokens** - Secure session management
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+ and pnpm
 - Git
+- Supabase account ([supabase.com](https://supabase.com))
 
-### Installation
+### 1. Clone and Install
+```bash
+git clone https://github.com/Swastik45/Bill_Prediction.git
+cd BillPrediction
+pnpm install
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Swastik45/Bill_Prediction.git
-   cd BillPrediction
-   ```
+### 2. Set up Supabase Database
 
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
+#### Create a Supabase Project
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Wait for the database to be set up (usually 2-3 minutes)
 
-3. **Start development server**
-   ```bash
-   pnpm dev
-   ```
+#### Configure Database Schema
+1. Go to your Supabase dashboard → SQL Editor
+2. Copy and run the SQL from `supabase-schema.sql` in your project
+3. This creates the `users` and `predictions` tables with proper security policies
 
-4. **Open your browser**
-   ```
-   http://localhost:3000
-   ```
+#### Get API Keys
+1. Go to Settings → API in your Supabase dashboard
+2. Copy the following values:
+   - **Project URL**
+   - **anon/public key**
+   - **service_role key** (keep this secret!)
+
+### 3. Environment Variables
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` and add your Supabase credentials:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+```
+
+### 4. Run Development Server
+```bash
+pnpm dev
+```
+
+### 5. Open Your App
+Visit [http://localhost:3000](http://localhost:3000) and start using BillInsight!
+
+---
+
+## 🔧 Supabase Database Schema
+
+The app uses two main tables:
+
+### `users` table
+- User profiles with authentication
+- Row Level Security (RLS) enabled
+- Users can only access their own data
+
+### `predictions` table
+- Stores bill prediction history
+- Linked to users via `user_id`
+- RLS ensures users see only their predictions
+
+**Security Features:**
+- Row Level Security (RLS) policies
+- JWT-based authentication
+- Secure password hashing via Supabase Auth
+- Automatic timestamp management
 
 ### Build for Production
 
@@ -191,8 +237,11 @@ pnpm test
 
 ### Vercel (Recommended)
 1. Connect GitHub repository to Vercel
-2. Deploy automatically on push to main branch
-3. Environment variables (if needed)
+2. **Add Environment Variables** in Vercel dashboard:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+3. Deploy automatically on push to main branch
 
 ### Other Platforms
 - **Netlify**: Static deployment
@@ -217,9 +266,9 @@ pnpm test
 ## 📝 Future Enhancements
 
 ### High Priority
-- [ ] Real database integration (PostgreSQL/SQLite)
-- [ ] Password hashing with bcrypt
-- [ ] JWT authentication tokens
+- [x] **Real database integration** (Supabase PostgreSQL)
+- [x] **Secure authentication** (Supabase Auth with JWT)
+- [x] **Password hashing** (via Supabase Auth)
 - [ ] Email verification for registration
 - [ ] Advanced ML models for predictions
 

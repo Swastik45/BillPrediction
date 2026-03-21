@@ -99,7 +99,11 @@ export default function BillApp(): React.ReactNode {
 
   const deleteHistoryItem = async (id: number) => {
     try {
-      const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/history/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user?.id })
+      });
       if (res.ok) setHistory(history.filter((item) => item.id !== id));
     } catch (err) {
       console.error("Failed to delete item:", err);

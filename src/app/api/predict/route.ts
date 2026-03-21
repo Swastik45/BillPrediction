@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { predictBill, createHistoryItem } from '@/lib/fakeDB';
+import { createPrediction } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,11 +10,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ detail: 'Invalid units value' }, { status: 400 });
     }
 
-    const predicted_bill = predictBill(parsedUnits);
-    createHistoryItem({ user_id: user_id != null ? Number(user_id) : null, units: parsedUnits, predicted_bill });
+    if (!user_id) {
+      return NextResponse.json({ detail: 'User ID is required' }, { status: 400 });
+    }
 
-    return NextResponse.json({ predicted_bill });
+    const prediction = await createPrediction(user_id, parsedUnits);
+
+    return NextResponse.json({ predicted_bill: prediction.predicted_bill });
   } catch (error) {
-    return NextResponse.json({ detail: 'Prediction error' }, { status: 500 });
+    console.error('Prediction error:', error);
+    const message = error instanceof Error ? error.message : 'Prediction failed';
+    return NextResponse.json({ detail: message }, { status: 500 });
   }
 }

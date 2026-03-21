@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getHistory, clearHistory } from '@/lib/fakeDB';
+import { getUserPredictions, getAllPredictions, clearUserPredictions } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('user_id');
-    const user_id = userId ? Number(userId) : null;
-    const data = getHistory(user_id);
+
+    let data;
+    if (userId) {
+      data = await getUserPredictions(userId);
+    } else {
+      data = await getAllPredictions();
+    }
+
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json({ detail: 'Unable to get history' }, { status: 500 });
+    console.error('History fetch error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch history';
+    return NextResponse.json({ detail: message }, { status: 500 });
   }
 }
 
@@ -17,10 +25,16 @@ export async function DELETE(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('user_id');
-    const user_id = userId ? Number(userId) : null;
-    clearHistory(user_id);
+
+    if (!userId) {
+      return NextResponse.json({ detail: 'User ID is required' }, { status: 400 });
+    }
+
+    await clearUserPredictions(userId);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ detail: 'Unable to clear history' }, { status: 500 });
+    console.error('History clear error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to clear history';
+    return NextResponse.json({ detail: message }, { status: 500 });
   }
 }

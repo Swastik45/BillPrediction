@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByUsername } from '@/lib/fakeDB';
+import { signInUser } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
 
     if (!username || !password) {
-      return NextResponse.json({ detail: 'Missing username or password' }, { status: 400 });
+      return NextResponse.json({ detail: 'Username and password are required' }, { status: 400 });
     }
 
-    const user = findUserByUsername(username);
-    if (!user || user.password !== password) {
-      return NextResponse.json({ detail: 'Invalid username or password' }, { status: 401 });
-    }
+    // For Supabase, we need email, not username
+    // We'll need to look up the email by username first
+    const user = await signInUser(username, password);
 
     const safeUser = {
       id: user.id,
@@ -24,6 +23,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(safeUser);
   } catch (error) {
-    return NextResponse.json({ detail: 'Could not login' }, { status: 500 });
+    console.error('Login error:', error);
+    const message = error instanceof Error ? error.message : 'Login failed';
+    return NextResponse.json({ detail: message }, { status: 401 });
   }
 }
