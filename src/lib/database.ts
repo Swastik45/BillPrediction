@@ -32,14 +32,15 @@ export async function createUserWithAuth(email: string, password: string, userDa
     throw new Error('Username already exists')
   }
 
-  // Create auth user with admin API (auto-confirmed)
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  // Create auth user with regular signup (email confirmation disabled in Supabase settings)
+  const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
-    email_confirm: true, // Auto-confirm email
-    user_metadata: {
-      username: userData.username,
-      full_name: userData.full_name,
+    options: {
+      data: {
+        username: userData.username,
+        full_name: userData.full_name,
+      }
     }
   })
 
@@ -50,6 +51,9 @@ export async function createUserWithAuth(email: string, password: string, userDa
   if (!authData.user) {
     throw new Error('Failed to create user')
   }
+
+  // Wait a moment for the user to be created
+  await new Promise(resolve => setTimeout(resolve, 1000))
 
   // Create user profile
   const { data: profileData, error: profileError } = await supabase
@@ -65,7 +69,7 @@ export async function createUserWithAuth(email: string, password: string, userDa
 
   if (profileError) {
     // Clean up auth user if profile creation fails
-    await supabase.auth.admin.deleteUser(authData.user.id)
+    console.error('Profile creation error:', profileError)
     throw new Error('Failed to create user profile')
   }
 
