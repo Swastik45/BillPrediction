@@ -113,15 +113,17 @@ export default function BillApp(): React.ReactNode {
   const clearAllHistory = async () => {
     if (!window.confirm("Clear all prediction history? This cannot be undone.")) return;
     try {
-      const url = isLoggedIn
-        ? `/api/history?user_id=${user?.id}`
-        : "/api/history";
-      const res = await fetch(url, { method: "DELETE" });
-      if (res.ok) {
-        setHistory([]);
-        await fetchHistory();
+      if (isLoggedIn && user?.id) {
+        const res = await fetch(`/api/history?user_id=${user.id}`, { method: "DELETE" });
+        if (res.ok) {
+          setHistory([]);
+          await fetchHistory();
+        } else {
+          setError("Failed to clear history. Please try again.");
+        }
       } else {
-        setError("Failed to clear history. Please try again.");
+        // For guests, just clear local state (they have no persistent history)
+        setHistory([]);
       }
     } catch (err) {
       setError("Failed to clear history. Please ensure the backend is running.");
@@ -673,18 +675,37 @@ export default function BillApp(): React.ReactNode {
               <div className="brand-sub">AI-Powered Cost Prediction Engine</div>
             </div>
             <div className="header-stats">
-              <div className="stat-item">
-                <div className="stat-label">Predictions</div>
-                <div className="stat-value">{String(history.length).padStart(2, '0')}</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Avg. Bill</div>
-                <div className="stat-value gold">${avgBill.toFixed(2)}</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Total Units</div>
-                <div className="stat-value">{totalUnits.toFixed(0)}</div>
-              </div>
+              {isLoggedIn ? (
+                <>
+                  <div className="stat-item">
+                    <div className="stat-label">Predictions</div>
+                    <div className="stat-value">{String(history.length).padStart(2, '0')}</div>
+                  </div>
+                  <div className="stat-item">
+                    <div className="stat-label">Avg. Bill</div>
+                    <div className="stat-value gold">${avgBill.toFixed(2)}</div>
+                  </div>
+                  <div className="stat-item">
+                    <div className="stat-label">Total Units</div>
+                    <div className="stat-value">{totalUnits.toFixed(0)}</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="stat-item">
+                    <div className="stat-label">Predictions</div>
+                    <div className="stat-value">--</div>
+                  </div>
+                  <div className="stat-item">
+                    <div className="stat-label">Avg. Bill</div>
+                    <div className="stat-value gold">--</div>
+                  </div>
+                  <div className="stat-item">
+                    <div className="stat-label">Total Units</div>
+                    <div className="stat-value">--</div>
+                  </div>
+                </>
+              )}
             </div>
           </header>
 

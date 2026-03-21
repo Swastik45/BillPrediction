@@ -6,11 +6,12 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const userId = url.searchParams.get('user_id');
 
-    let data;
+    let data: any[] = [];
     if (userId) {
       data = await getUserPredictions(userId);
     } else {
-      data = await getAllPredictions();
+      // Guest users should not see any historical data for security
+      data = [];
     }
 
     return NextResponse.json(data);
